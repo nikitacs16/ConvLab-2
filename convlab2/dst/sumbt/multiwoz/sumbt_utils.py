@@ -67,7 +67,7 @@ class Processor(DataProcessor):
 
         # sorting the ontology according to the alphabetic order of the slots
         ontology = collections.OrderedDict(sorted(ontology.items()))
-
+        print(ontology)
         # select slots to train
         nslots = len(ontology.keys())
         target_slot = list(ontology.keys())
@@ -121,14 +121,15 @@ class Processor(DataProcessor):
                     prev_dialogue_index = line[0]
                 else:
                     # The symbol '#' will be replaced with '[SEP]' after tokenization.
-                    text_a = line[2] + " # " + text_a
-                    text_b = line[3] + " # " + text_b
+                    text_a = line[2] + "  " + text_a
+                    text_b = line[3] + "  " + text_b
             else:
                 text_a = line[2]  # line[2]: user utterance
                 text_b = line[3]  # line[3]: system response
 
+            
             label = [line[4 + idx] for idx in self.target_slot_idx]
-
+            
             examples.append(
                 InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
         return examples

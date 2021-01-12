@@ -96,7 +96,7 @@ class BeliefTracker(nn.Module):
         self.bert_output_dim = self.utterance_encoder.config.hidden_size
         self.hidden_dropout_prob = self.utterance_encoder.config.hidden_dropout_prob
         if args.fix_utterance_encoder:
-            for p in self.utterance_encoder.bert.pooler.parameters():
+            for p in self.utterance_encoder.bert.parameters():
                 p.requires_grad = False
 
         ### slot, slot-value Encoder (not trainable)

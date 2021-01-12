@@ -85,3 +85,6 @@ test.py
 
 *.egg-info
 pre-trained-models/
+
+*.zip
+*.bin

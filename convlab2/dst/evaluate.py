@@ -199,7 +199,7 @@ if __name__ == '__main__':
                 model = MultiWozMDBT()
             else:
                 raise Exception("Available models: TRADE/mdbt/sumbt")
-
+        dataset_name = dataset_name + "zh"
         ## load data
         from convlab2.util.dataloader.module_dataloader import AgentDSTDataloader
         from convlab2.util.dataloader.dataset_dataloader import MultiWOZDataloader

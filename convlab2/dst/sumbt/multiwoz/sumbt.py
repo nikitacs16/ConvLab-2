@@ -24,13 +24,25 @@ from convlab2.dst.sumbt.multiwoz.sumbt_config import *
 from convlab2.util.multiwoz.multiwoz_slot_trans import REF_SYS_DA, REF_USR_DA
 
 USE_CUDA = torch.cuda.is_available()
-N_GPU = torch.cuda.device_count() if USE_CUDA else 1
+N_GPU = 1 #torch.cuda.device_count() if USE_CUDA else 1
 DEVICE = "cuda" if USE_CUDA else "cpu"
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 SUMBT_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(ROOT_PATH, 'data/multiwoz')
 DOWNLOAD_DIRECTORY = os.path.join(SUMBT_PATH, 'downloaded_model')
 multiwoz_slot_list = ['attraction-area', 'attraction-name', 'attraction-type', 'hotel-day', 'hotel-people', 'hotel-stay', 'hotel-area', 'hotel-internet', 'hotel-name', 'hotel-parking', 'hotel-pricerange', 'hotel-stars', 'hotel-type', 'restaurant-day', 'restaurant-people', 'restaurant-time', 'restaurant-area', 'restaurant-food', 'restaurant-name', 'restaurant-pricerange', 'taxi-arriveby', 'taxi-departure', 'taxi-destination', 'taxi-leaveat', 'train-people', 'train-arriveby', 'train-day', 'train-departure', 'train-destination', 'train-leaveat']
+#multiwoz_slot_list = ['公共汽车-出发地', '公共汽车-出发时间', '公共汽车-到达时间', '公共汽车-日期', '公共汽车-目的地', '出租车-出发地', '出租车-出发时间', '出租车-到达时间', '出租车-目的地', '列车-出发地', '列车-出发时间', '列车-到达时间', '列车-日期', '列车-目的地', '列车-预订人数', '医院-科室', '旅馆-互联网', '旅馆-价格范围', '旅馆-停车处', '旅馆-区域', '旅馆-名称', '旅馆-星级', '旅馆-类型', '旅馆-预订人数', '旅馆-预订停留天数', '旅馆-预订日期', '景点-区域', '景点-名称', '景点-类型', '餐厅-价格范围', '餐厅-区域', '餐厅-名称', '餐厅-预订人数', '餐厅-预订日期', '餐厅-预订时间', '餐厅-食物']
+
+TORCH_VERSION_3 = '0.3' == torch.__version__[:3]
+
+def _clip_grad_norm(params, clip_grad_norm):
+    clip_fn = torch.nn.utils.clip_grad_norm_ if not TORCH_VERSION_3 else torch.nn.utils.clip_grad_norm
+    for p in params:
+        if isinstance(p, dict):
+            clip_fn(p['params'], clip_grad_norm)
+        else:
+            clip_fn(p, clip_grad_norm)
+
 
 
 def get_label_embedding(labels, max_seq_length, tokenizer, device):
@@ -175,7 +187,7 @@ class SUMBTTracker(DST):
         else:
             ptr_model = torch.load(model_ckpt)
         print('loading pretrained weights')
-
+        #ptr_model = {k:v for k, v in ptr_model.items() if 'lookup' not in k}
         if not USE_CUDA or N_GPU == 1:
             state = model.state_dict()
             state.update(ptr_model)
@@ -186,11 +198,12 @@ class SUMBTTracker(DST):
 
         if USE_CUDA:
             model.to("cuda")
+        #print(state['slot_lookup.weight'].size())
 
     def init_session(self):
         self.state = default_state()
         if not self.param_restored:
-            if os.path.isfile(os.path.join(DOWNLOAD_DIRECTORY, 'pytorch_model.bin')):
+            if os.path.isfile(os.path.join(DOWNLOAD_DIRECTORY, 'pytorch_model_.bin')):
                 print('loading weights from downloaded model')
                 self.load_weights(model_path=os.path.join(DOWNLOAD_DIRECTORY, 'pytorch_model.bin'))
             elif os.path.isfile(os.path.join(SUMBT_PATH, args.output_dir, 'pytorch_model.bin')):
@@ -489,7 +502,8 @@ class SUMBTTracker(DST):
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = lr_this_step
                     if scheduler is not None:
-                        torch.nn.utils.clip_grad_norm_(optimizer_grouped_parameters, 1.0)
+                        _clip_grad_norm(optimizer_grouped_parameters, 1.0)
+                        #torch.nn.utils.clip_grad_norm_(optimizer_grouped_parameters, 1.0)
                     optimizer.step()
                     if scheduler is not None:
                         scheduler.step()

@@ -1,0 +1,2 @@
+joint acc (7 domain) : slot acc (7 domain) : joint acc (5 domain): slot acc (5 domain): joint restaurant : slot acc restaurant 
+0.00000 : 0.21371 : 0.00000 : 0.18364 : 0.00000 : 0.25234 

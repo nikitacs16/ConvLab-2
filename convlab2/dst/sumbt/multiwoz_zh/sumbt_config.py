@@ -10,26 +10,25 @@ class DotMap():
         self.attn_head = 4
         self.do_eval = True
         self.do_train = False
-        self.train_batch_size = 3
+        self.train_batch_size = 1
         self.dev_batch_size = 1
         self.eval_batch_size  = 1
         self.learning_rate = 5e-5
-        self.num_train_epochs = 3
         self.patience = 10
         self.warmup_proportion = 0.1
         self.local_rank = -1
         self.seed = 42
-        self.gradient_accumulation_steps = 1
+        self.gradient_accumulation_steps = 4
         self.fp16 = False
         self.loss_scale = 0
         self.do_not_use_tensorboard = False
-        self.fix_utterance_encoder = False
+        self.fix_utterance_encoder = True
         self.do_eval = True
         self.num_train_epochs = 300
 
-        self.bert_model = os.path.join(convlab2.get_root_path(), "pre-trained-models/chinese-bert-wwm-ext")
+        self.bert_model = os.path.join("/fs/startiger0/nmoghe/experiments/pbert/mbert-en-from-en-de-line-by-line") #convlab2.get_root_path(), "pre-trained-models/bert-base-multilingual-uncased")
         self.bert_model_cache_dir = os.path.join(convlab2.get_root_path(), "pre-trained-models/")
-        self.bert_model_name = "hfl/chinese-bert-wwm-ext"
+        self.bert_model_name = "/fs/startiger0/nmoghe/experiments/pbert/mbert-en-from-en-de-line-by-line"
         self.do_lower_case = True
         self.task_name = 'bert-gru-sumbt'
         self.nbt = 'rnn'
@@ -48,6 +47,6 @@ class DotMap():
         self.data_dir = 'data/multiwoz_zh/'
         self.tf_dir = 'tensorboard'
         self.tmp_data_dir = 'processed_data/'
-        self.output_dir = 'model_output/'
+        self.output_dir = 'model_output_mbert_os_en_no_ft/'
 
 args = DotMap()
