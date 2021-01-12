@@ -1,5 +1,4 @@
 import os
-
 import convlab2
 class DotMap():
     def __init__(self):

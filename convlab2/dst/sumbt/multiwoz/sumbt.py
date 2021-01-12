@@ -4,6 +4,7 @@ import random
 from itertools import chain
 import numpy as np
 import zipfile
+import yaml
 
 from tensorboardX.writer import SummaryWriter
 from tqdm._tqdm import trange, tqdm
@@ -16,11 +17,11 @@ from transformers import BertTokenizer
 from transformers import get_linear_schedule_with_warmup, AdamW
 
 from convlab2.dst.dst import DST
-from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_format
-from convlab2.util.multiwoz.state import default_state
+#from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_format
+#from convlab2.util.multiwoz.state import default_state
 from convlab2.dst.sumbt.BeliefTrackerSlotQueryMultiSlot import BeliefTracker
-from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
-from convlab2.dst.sumbt.multiwoz.sumbt_config import *
+#from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
+#from convlab2.dst.sumbt.multiwoz.sumbt_config import *
 from convlab2.util.multiwoz.multiwoz_slot_trans import REF_SYS_DA, REF_USR_DA
 
 USE_CUDA = torch.cuda.is_available()
@@ -30,8 +31,8 @@ ROOT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.p
 SUMBT_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(ROOT_PATH, 'data/multiwoz')
 DOWNLOAD_DIRECTORY = os.path.join(SUMBT_PATH, 'downloaded_model')
-multiwoz_slot_list = ['attraction-area', 'attraction-name', 'attraction-type', 'hotel-day', 'hotel-people', 'hotel-stay', 'hotel-area', 'hotel-internet', 'hotel-name', 'hotel-parking', 'hotel-pricerange', 'hotel-stars', 'hotel-type', 'restaurant-day', 'restaurant-people', 'restaurant-time', 'restaurant-area', 'restaurant-food', 'restaurant-name', 'restaurant-pricerange', 'taxi-arriveby', 'taxi-departure', 'taxi-destination', 'taxi-leaveat', 'train-people', 'train-arriveby', 'train-day', 'train-departure', 'train-destination', 'train-leaveat']
-#multiwoz_slot_list = ['公共汽车-出发地', '公共汽车-出发时间', '公共汽车-到达时间', '公共汽车-日期', '公共汽车-目的地', '出租车-出发地', '出租车-出发时间', '出租车-到达时间', '出租车-目的地', '列车-出发地', '列车-出发时间', '列车-到达时间', '列车-日期', '列车-目的地', '列车-预订人数', '医院-科室', '旅馆-互联网', '旅馆-价格范围', '旅馆-停车处', '旅馆-区域', '旅馆-名称', '旅馆-星级', '旅馆-类型', '旅馆-预订人数', '旅馆-预订停留天数', '旅馆-预订日期', '景点-区域', '景点-名称', '景点-类型', '餐厅-价格范围', '餐厅-区域', '餐厅-名称', '餐厅-预订人数', '餐厅-预订日期', '餐厅-预订时间', '餐厅-食物']
+multiwoz_slot_list_en = ['attraction-area', 'attraction-name', 'attraction-type', 'hotel-day', 'hotel-people', 'hotel-stay', 'hotel-area', 'hotel-internet', 'hotel-name', 'hotel-parking', 'hotel-pricerange', 'hotel-stars', 'hotel-type', 'restaurant-day', 'restaurant-people', 'restaurant-time', 'restaurant-area', 'restaurant-food', 'restaurant-name', 'restaurant-pricerange', 'taxi-arriveby', 'taxi-departure', 'taxi-destination', 'taxi-leaveat', 'train-people', 'train-arriveby', 'train-day', 'train-departure', 'train-destination', 'train-leaveat']
+multiwoz_slot_list_zh = ['公共汽车-出发地', '公共汽车-出发时间', '公共汽车-到达时间', '公共汽车-日期', '公共汽车-目的地', '出租车-出发地', '出租车-出发时间', '出租车-到达时间', '出租车-目的地', '列车-出发地', '列车-出发时间', '列车-到达时间', '列车-日期', '列车-目的地', '列车-预订人数', '医院-科室', '旅馆-互联网', '旅馆-价格范围', '旅馆-停车处', '旅馆-区域', '旅馆-名称', '旅馆-星级', '旅馆-类型', '旅馆-预订人数', '旅馆-预订停留天数', '旅馆-预订日期', '景点-区域', '景点-名称', '景点-类型', '餐厅-价格范围', '餐厅-区域', '餐厅-名称', '餐厅-预订人数', '餐厅-预订日期', '餐厅-预订时间', '餐厅-食物']
 
 TORCH_VERSION_3 = '0.3' == torch.__version__[:3]
 
@@ -87,7 +88,7 @@ class SUMBTTracker(DST):
     """
 
 
-    def __init__(self, data_dir=DATA_PATH, model_file='https://convlab.blob.core.windows.net/convlab-2/sumbt.tar.gz', eval_slots=multiwoz_slot_list):
+    def __init__(self, data_dir=DATA_PATH, model_file='https://convlab.blob.core.windows.net/convlab-2/sumbt.tar.gz', arg_path='config.yaml',eval_slots=multiwoz_slot_list):
 
         DST.__init__(self)
 
@@ -100,11 +101,22 @@ class SUMBTTracker(DST):
         #     temp_file.extractall('data')
         #     assert os.path.exists(data_dir)
 
+        args = yaml.load(open(arg_path))
+        args = SimpleNamespace(**args)
         processor = Processor(args)
         self.processor = processor
         label_list = processor.get_labels()
         num_labels = [len(labels) for labels in label_list]  # number of slot-values in each slot-type
-
+        if args.lang == 'zh':
+            from convlab2.dst.sumbt.multiwoz_zh.convert_to_glue_format import convert_to_glue_format
+            from convlab2.dst.sumbt.multiwoz_zh.sumbt_utils import *
+            from convlab2.util.multiwoz_zh.state import default_state
+            eval_slots = multiwoz_slot_list_zh
+        else:
+            from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_format
+            from convlab2.util.multiwoz.state import default_state
+            from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
+            eval_slots = multiwoz_slot_list_en
         # tokenizer
         self.tokenizer = BertTokenizer.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
         random.seed(args.seed)
@@ -157,7 +169,6 @@ class SUMBTTracker(DST):
         self.dev_examples = processor.get_dev_examples(os.path.join(SUMBT_PATH, args.tmp_data_dir), accumulation=False)
         self.test_examples = processor.get_test_examples(os.path.join(SUMBT_PATH, args.tmp_data_dir), accumulation=False)
         self.eval_slots = eval_slots
-        self.download_model()
 
     def download_model(self):
         if not os.path.isdir(DOWNLOAD_DIRECTORY):
@@ -245,6 +256,9 @@ class SUMBTTracker(DST):
             slot = REF_SYS_DA[domain.capitalize()].get(slot, slot)
             assert 'semi' in new_belief_state[domain]
             assert 'book' in new_belief_state[domain]
+            if '预订' in slot:
+                assert slot.startswith('预订')
+
             if 'book' in slot:
                 assert slot.startswith('book ')
                 slot = slot.strip().split()[1]
