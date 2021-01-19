@@ -225,9 +225,9 @@ class SUMBTTracker(DST):
             if os.path.isfile(os.path.join(DOWNLOAD_DIRECTORY, 'pytorch_model_.bin')):
                 print('loading weights from downloaded model')
                 self.load_weights(model_path=os.path.join(DOWNLOAD_DIRECTORY, 'pytorch_model.bin'))
-            elif os.path.isfile(os.path.join(SUMBT_PATH, args.output_dir, 'pytorch_model.bin')):
+            elif os.path.isfile(os.path.join(SUMBT_PATH, self.args.output_dir, 'pytorch_model.bin')):
                 print('loading weights from trained model')
-                self.load_weights(model_path=os.path.join(SUMBT_PATH, args.output_dir, 'pytorch_model.bin'))
+                self.load_weights(model_path=os.path.join(SUMBT_PATH, self.args.output_dir, 'pytorch_model.bin'))
             else:
                 raise ValueError('no availabel weights found.')
             self.param_restored = True
@@ -348,22 +348,21 @@ class SUMBTTracker(DST):
         return predict_belief
 
     def train(self, load_model=False, model_path=None):
-        args = self.args
 
         if load_model:
             if model_path is not None:
                 self.load_weights(model_path)
         ## Training utterances
         all_input_ids, all_input_len, all_label_ids = convert_examples_to_features(
-            self.train_examples, self.label_list, args.max_seq_length, self.tokenizer, args.max_turn_length)
+            self.train_examples, self.label_list, self.args.max_seq_length, self.tokenizer, self.args.max_turn_length)
 
         num_train_batches = all_input_ids.size(0)
         num_train_steps = int(
-            num_train_batches / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
+            num_train_batches / self.args.train_batch_size / self.args.gradient_accumulation_steps * self.args.num_train_epochs)
 
         logger.info("***** training *****")
         logger.info("  Num examples = %d", len(self.train_examples))
-        logger.info("  Batch size = %d", args.train_batch_size)
+        logger.info("  Batch size = %d", self.args.train_batch_size)
         logger.info("  Num steps = %d", num_train_steps)
 
         all_input_ids, all_input_len, all_label_ids = all_input_ids.to(DEVICE), all_input_len.to(
@@ -371,31 +370,31 @@ class SUMBTTracker(DST):
 
         train_data = TensorDataset(all_input_ids, all_input_len, all_label_ids)
         train_sampler = RandomSampler(train_data)
-        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size)
+        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=self.args.train_batch_size)
 
         all_input_ids_dev, all_input_len_dev, all_label_ids_dev = convert_examples_to_features(
-            self.dev_examples, self.label_list, args.max_seq_length, self.tokenizer, args.max_turn_length)
+            self.dev_examples, self.label_list, self.args.max_seq_length, self.tokenizer, self.args.max_turn_length)
 
         logger.info("***** validation *****")
         logger.info("  Num examples = %d", len(self.dev_examples))
-        logger.info("  Batch size = %d", args.dev_batch_size)
+        logger.info("  Batch size = %d", self.args.dev_batch_size)
 
         all_input_ids_dev, all_input_len_dev, all_label_ids_dev = \
             all_input_ids_dev.to(DEVICE), all_input_len_dev.to(DEVICE), all_label_ids_dev.to(DEVICE)
 
         dev_data = TensorDataset(all_input_ids_dev, all_input_len_dev, all_label_ids_dev)
         dev_sampler = SequentialSampler(dev_data)
-        dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=args.dev_batch_size)
+        dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=self.args.dev_batch_size)
 
         logger.info("Loaded data!")
 
-        if args.fp16:
+        if self.args.fp16:
             self.sumbt_model.half()
         self.sumbt_model.to(DEVICE)
 
         ## Get domain-slot-type embeddings
         slot_token_ids, slot_len = \
-            get_label_embedding(self.processor.target_slot, args.max_label_length, self.tokenizer, DEVICE)
+            get_label_embedding(self.processor.target_slot, self.args.max_label_length, self.tokenizer, DEVICE)
 
         # for slot_idx, slot_str in zip(slot_token_ids, self.processor.target_slot):
         #     self.idx2slot[slot_idx] = slot_str
@@ -404,7 +403,7 @@ class SUMBTTracker(DST):
         label_token_ids, label_len = [], []
         for slot_idx, labels in zip(slot_token_ids, self.label_list):
             # self.idx2value[slot_idx] = {}
-            token_ids, lens = get_label_embedding(labels, args.max_label_length, self.tokenizer, DEVICE)
+            token_ids, lens = get_label_embedding(labels, self.args.max_label_length, self.tokenizer, DEVICE)
             label_token_ids.append(token_ids)
             label_len.append(lens)
             # for label, token_id in zip(labels, token_ids):
@@ -422,9 +421,9 @@ class SUMBTTracker(DST):
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             optimizer_grouped_parameters = [
                 {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01,
-                 'lr': args.learning_rate},
+                 'lr': self.args.learning_rate},
                 {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
-                 'lr': args.learning_rate},
+                 'lr': self.args.learning_rate},
             ]
             return optimizer_grouped_parameters
 
@@ -436,7 +435,7 @@ class SUMBTTracker(DST):
         t_total = num_train_steps
 
         scheduler = None
-        if args.fp16:
+        if self.args.fp16:
             try:
                 from apex.optimizers import FP16_Optimizer
                 from apex.optimizers import FusedAdam
@@ -445,17 +444,17 @@ class SUMBTTracker(DST):
                     "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
 
             optimizer = FusedAdam(optimizer_grouped_parameters,
-                                  lr=args.learning_rate,
+                                  lr=self.args.learning_rate,
                                   bias_correction=False,
                                   max_grad_norm=1.0)
-            if args.fp16_loss_scale == 0:
+            if self.args.fp16_loss_scale == 0:
                 optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
             else:
-                optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.fp16_loss_scale)
+                optimizer = FP16_Optimizer(optimizer, static_loss_scale=self.args.fp16_loss_scale)
 
         else:
-            optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, correct_bias=False)
-            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_proportion*t_total, num_training_steps=t_total)
+            optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.learning_rate, correct_bias=False)
+            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.args.warmup_proportion*t_total, num_training_steps=t_total)
         logger.info(optimizer)
 
         # Training code
@@ -467,12 +466,12 @@ class SUMBTTracker(DST):
         last_update = None
         best_loss = None
         model = self.sumbt_model
-        if not args.do_not_use_tensorboard:
+        if not self.args.do_not_use_tensorboard:
             summary_writer = None
         else:
             summary_writer = SummaryWriter("./tensorboard_summary/logs_1214/")
 
-        for epoch in trange(int(args.num_train_epochs), desc="Epoch"):
+        for epoch in trange(int(self.args.num_train_epochs), desc="Epoch"):
             # Train
             model.train()
             tr_loss = 0
@@ -494,11 +493,11 @@ class SUMBTTracker(DST):
                     acc = acc.mean()
                     acc_slot = acc_slot.mean(0)
 
-                if args.gradient_accumulation_steps > 1:
-                    loss = loss / args.gradient_accumulation_steps
+                if self.args.gradient_accumulation_steps > 1:
+                    loss = loss / self.args.gradient_accumulation_steps
 
                 # Backward
-                if args.fp16:
+                if self.args.fp16:
                     optimizer.backward(loss)
                 else:
                     loss.backward()
@@ -517,9 +516,9 @@ class SUMBTTracker(DST):
                 tr_loss += loss.item()
                 nb_tr_examples += input_ids.size(0)
                 nb_tr_steps += 1
-                if (step + 1) % args.gradient_accumulation_steps == 0:
+                if (step + 1) % self.args.gradient_accumulation_steps == 0:
                     # modify lealrning rate with special warm up BERT uses
-                    lr_this_step = args.learning_rate * warmup_linear(global_step / t_total, args.warmup_proportion)
+                    lr_this_step = self.args.learning_rate * warmup_linear(global_step / t_total, self.args.warmup_proportion)
                     if summary_writer is not None:
                         summary_writer.add_scalar("Train/LearningRate", lr_this_step, global_step)
                     for param_group in optimizer.param_groups:
@@ -595,7 +594,7 @@ class SUMBTTracker(DST):
 
             dev_loss = round(dev_loss, 6)
 
-            output_model_file = os.path.join(os.path.join(SUMBT_PATH, args.output_dir), "pytorch_model.bin")
+            output_model_file = os.path.join(os.path.join(SUMBT_PATH, self.args.output_dir), "pytorch_model.bin")
 
             if last_update is None or dev_loss < best_loss:
 
@@ -616,7 +615,7 @@ class SUMBTTracker(DST):
                     "*** Model NOT Updated: Epoch=%d, Validation Loss=%.6f, Validation Acc=%.6f, global_step=%d  ***" % (
                         epoch, dev_loss, dev_acc, global_step))
 
-            if last_update + args.patience <= epoch:
+            if last_update + self.args.patience <= epoch:
                 break
 
 
@@ -632,18 +631,18 @@ class SUMBTTracker(DST):
             eval_examples = self.test_examples
 
         all_input_ids, all_input_len, all_label_ids = convert_examples_to_features(
-            eval_examples, self.label_list, args.max_seq_length, self.tokenizer, args.max_turn_length)
+            eval_examples, self.label_list, self.args.max_seq_length, self.tokenizer, self.args.max_turn_length)
         all_input_ids, all_input_len, all_label_ids = all_input_ids.to(DEVICE), all_input_len.to(
             DEVICE), all_label_ids.to(DEVICE)
         logger.info("***** Running evaluation *****")
         logger.info("  Num examples = %d", len(eval_examples))
-        logger.info("  Batch size = %d", args.dev_batch_size)
+        logger.info("  Batch size = %d", self.args.dev_batch_size)
 
         eval_data = TensorDataset(all_input_ids, all_input_len, all_label_ids)
 
         # Run prediction for full data
         eval_sampler = SequentialSampler(eval_data)
-        eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.dev_batch_size)
+        eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=self.args.dev_batch_size)
 
         model = self.sumbt_model
         eval_loss, eval_accuracy = 0, 0
@@ -711,7 +710,7 @@ class SUMBTTracker(DST):
         out_file_name = 'eval_results'
         # if TARGET_SLOT == 'all':
         #     out_file_name += '_all'
-        output_eval_file = os.path.join(os.path.join(SUMBT_PATH, args.output_dir), "%s.txt" % out_file_name)
+        output_eval_file = os.path.join(os.path.join(SUMBT_PATH, self.args.output_dir), "%s.txt" % out_file_name)
 
         if not USE_CUDA or N_GPU == 1:
             with open(output_eval_file, "w") as writer:
@@ -721,7 +720,7 @@ class SUMBTTracker(DST):
                     writer.write("%s = %s\n" % (key, str(result[key])))
 
         out_file_name = 'eval_all_accuracies'
-        with open(os.path.join(os.path.join(SUMBT_PATH, args.output_dir), "%s.txt" % out_file_name), 'w') as f:
+        with open(os.path.join(os.path.join(SUMBT_PATH, self.args.output_dir), "%s.txt" % out_file_name), 'w') as f:
             f.write(
                 'joint acc (7 domain) : slot acc (7 domain) : joint acc (5 domain): slot acc (5 domain): joint '
                 'restaurant : slot acc restaurant \n')
