@@ -4,11 +4,11 @@ import random
 from itertools import chain
 import numpy as np
 import zipfile
-import yaml
+#import yaml
 
 from tensorboardX.writer import SummaryWriter
 from tqdm._tqdm import trange, tqdm
-
+from types import SimpleNamespace
 from convlab2.util.file_util import cached_path
 
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
@@ -20,7 +20,7 @@ from convlab2.dst.dst import DST
 from convlab2.dst.sumbt.multiwoz_zh.convert_to_glue_format import convert_to_glue_format as convert_to_glue_format_zh
 from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_format as convert_to_glue_format_en
 from convlab2.util.multiwoz.state import default_state as default_state_en
-from convlab2.util.multiwoz_zh.state import default_state_zh as default_state_zh
+from convlab2.util.multiwoz_zh.state import default_state as default_state_zh
 
 from convlab2.dst.sumbt.BeliefTrackerSlotQueryMultiSlot import BeliefTracker
 from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
@@ -93,7 +93,7 @@ class SUMBTTracker(DST):
     """
 
 
-    def __init__(self, data_dir=DATA_PATH, model_file='https://convlab.blob.core.windows.net/convlab-2/sumbt.tar.gz', arg_path='config.yaml',eval_slots=multiwoz_slot_list):
+    def __init__(self, model_file='https://convlab.blob.core.windows.net/convlab-2/sumbt.tar.gz', arg_path=os.path.join(SUMBT_PATH,'config.json'),eval_slots=multiwoz_slot_list_en):
 
         DST.__init__(self)
 
@@ -106,11 +106,13 @@ class SUMBTTracker(DST):
         #     temp_file.extractall('data')
         #     assert os.path.exists(data_dir)
 
-        args = yaml.load(open(arg_path))
+        args = json.load(open(arg_path))
         args = SimpleNamespace(**args)
+        self.args = args
+        data_dir = os.path.join(ROOT_PATH,args.data_dir)
         if args.lang == 'zh':
             convert_to_glue_format = convert_to_glue_format_zh
-            defaul_state = defaul_state_zh
+            default_state = default_state_zh
             processor = ProcessorZh(args)
             eval_slots = multiwoz_slot_list_zh
         else:
@@ -167,7 +169,7 @@ class SUMBTTracker(DST):
                 self.det_dic[value.lower()] = key + '-' + domain
 
         self.cached_res = {}
-        convert_to_glue_format(DATA_PATH, SUMBT_PATH)
+        convert_to_glue_format(os.path.join(ROOT_PATH,args.data_dir), SUMBT_PATH)
         if not os.path.isdir(os.path.join(SUMBT_PATH, args.output_dir)):
             os.makedirs(os.path.join(SUMBT_PATH, args.output_dir))
         self.train_examples = processor.get_train_examples(os.path.join(SUMBT_PATH, args.tmp_data_dir), accumulation=False)
@@ -192,8 +194,9 @@ class SUMBTTracker(DST):
             # archive.extractall(DOWNLOAD_DIRECTORY)
 
     def load_weights(self, model_path=None):
+        
         if model_path is None:
-            model_ckpt = os.path.join(os.path.join(SUMBT_PATH, args.output_dir), 'pytorch_model.bin')
+            model_ckpt = os.path.join(os.path.join(SUMBT_PATH, self.args.output_dir), 'pytorch_model.bin')
         else:
             model_ckpt = model_path
         model = self.sumbt_model
@@ -345,6 +348,7 @@ class SUMBTTracker(DST):
         return predict_belief
 
     def train(self, load_model=False, model_path=None):
+        args = self.args
 
         if load_model:
             if model_path is not None:
