@@ -17,10 +17,15 @@ from transformers import BertTokenizer
 from transformers import get_linear_schedule_with_warmup, AdamW
 
 from convlab2.dst.dst import DST
-#from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_format
-#from convlab2.util.multiwoz.state import default_state
+from convlab2.dst.sumbt.multiwoz_zh.convert_to_glue_format import convert_to_glue_format as convert_to_glue_format_zh
+from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_format as convert_to_glue_format_en
+from convlab2.util.multiwoz.state import default_state as default_state_en
+from convlab2.util.multiwoz_zh.state import default_state_zh as default_state_zh
+
 from convlab2.dst.sumbt.BeliefTrackerSlotQueryMultiSlot import BeliefTracker
-#from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
+from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
+from convlab2.dst.sumbt.multiwoz.sumbt_utils import Processor as ProcessorEn
+from convlab2.dst.sumbt.multiwoz_zh.sumbt_utils import Processor as ProcessorZh
 #from convlab2.dst.sumbt.multiwoz.sumbt_config import *
 from convlab2.util.multiwoz.multiwoz_slot_trans import REF_SYS_DA, REF_USR_DA
 
@@ -103,20 +108,20 @@ class SUMBTTracker(DST):
 
         args = yaml.load(open(arg_path))
         args = SimpleNamespace(**args)
-        processor = Processor(args)
+        if args.lang == 'zh':
+            convert_to_glue_format = convert_to_glue_format_zh
+            defaul_state = defaul_state_zh
+            processor = ProcessorZh(args)
+            eval_slots = multiwoz_slot_list_zh
+        else:
+            convert_to_glue_format = convert_to_glue_format_en
+            default_state = default_state_en
+            processor = ProcessorEn(args)
+            eval_slots = multiwoz_slot_list_en
+
         self.processor = processor
         label_list = processor.get_labels()
         num_labels = [len(labels) for labels in label_list]  # number of slot-values in each slot-type
-        if args.lang == 'zh':
-            from convlab2.dst.sumbt.multiwoz_zh.convert_to_glue_format import convert_to_glue_format
-            from convlab2.dst.sumbt.multiwoz_zh.sumbt_utils import *
-            from convlab2.util.multiwoz_zh.state import default_state
-            eval_slots = multiwoz_slot_list_zh
-        else:
-            from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_format
-            from convlab2.util.multiwoz.state import default_state
-            from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
-            eval_slots = multiwoz_slot_list_en
         # tokenizer
         self.tokenizer = BertTokenizer.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
         random.seed(args.seed)

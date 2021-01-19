@@ -26,9 +26,9 @@
   do_eval: True,
   num_train_epochs: 300,
 
-  bert_model: 'pre-trained-models/bert-base-multilingual-uncased',
-  bert_model_cache_dir: 'pre-trained-models/',
-  bert_model_name: 'bert-base-multilingual-uncased',
+  bert_model: "pre-trained-models/bert-base-multilingual-uncased",
+  bert_model_cache_dir: "pre-trained-models/",
+  bert_model_name: "bert-base-multilingual-uncased",
   do_lower_case: True,
   task_name: 'bert-gru-sumbt',
   nbt: 'rnn',
@@ -44,5 +44,4 @@
   tf_dir: 'tensorboard',
   tmp_data_dir: 'processed_data/',
   output_dir: 'model_output_mbert_ft/',
-  data_path: ''
 }
