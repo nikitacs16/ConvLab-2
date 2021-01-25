@@ -9,7 +9,7 @@
   "do_eval" : true,
   "do_train" : false,
   "distance_metric" : "euclidean",
-  "train_batch_size" : 1,
+  "train_batch_size" : 3,
   "dev_batch_size" : 1,
   "eval_batch_size" : 16,
   "learning_rate" : 5e-4,
@@ -43,6 +43,6 @@
   "data_dir" : "data/multiwoz_zh/",
   "tf_dir" : "tensorboard",
   "tmp_data_dir" : "processed_data/zh",
-  "output_dir" : "model_output_mbert_train_zh_lstm_300_lr_5e4_bs_4_ft/"
+  "output_dir" : "model_output_mbert_train_zh_lstm_300_lr_5e4_bs_12_ft/"
 }
 

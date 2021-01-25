@@ -19,7 +19,7 @@ def trans_value(value):
     return trans.get(value, value)
 
 
-def convert_to_glue_format(data_dir, sumbt_dir):
+def convert_to_glue_format(data_dir, sumbt_dir, args):
 
     if not os.path.isdir(os.path.join(sumbt_dir, args.tmp_data_dir)):
         os.mkdir(os.path.join(sumbt_dir, args.tmp_data_dir))

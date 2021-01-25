@@ -3,7 +3,7 @@ import zipfile
 from convlab2.dst.sumbt.multiwoz.sumbt_config import *
 
 
-def convert_to_glue_format(data_dir, sumbt_dir):
+def convert_to_glue_format(data_dir, sumbt_dir,args):
 
     if not os.path.isdir(os.path.join(sumbt_dir, args.tmp_data_dir)):
         os.mkdir(os.path.join(sumbt_dir, args.tmp_data_dir))
@@ -52,9 +52,10 @@ def convert_to_glue_format(data_dir, sumbt_dir):
 
     for split_type, split_fp in zip(file_split, fp):
 
-        zipfile_name = "{}.json.zip".format(split_type)
-        zip_fp = zipfile.ZipFile(os.path.join(data_dir, zipfile_name))
-        data = json.loads(str(zip_fp.read(zip_fp.namelist()[0]), 'utf-8'))
+        #zipfile_name = "{}.json.zip".format(split_type)
+        
+        #zip_fp = zipfile.ZipFile(os.path.join(data_dir, zipfile_name))
+        data = json.load(open(os.path.join(data_dir,"{}.json".format(split_type))), encoding='utf-8')
 
         for file_id in data:
             user_utterance = ''

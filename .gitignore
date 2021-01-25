@@ -22,6 +22,7 @@ data/camrest/CamRest676_v2.json
 data/multiwoz/annotated_user_da_with_span_full.json
 data/schema/dstc8-schema-guided-dialogue-master
 **/processed_data/*
+data/**
 data/mdbt/data
 data/mdbt/models
 data/mdbt/word-vectors
@@ -88,3 +89,4 @@ pre-trained-models/
 
 *.zip
 *.bin
+**/**/config*.json

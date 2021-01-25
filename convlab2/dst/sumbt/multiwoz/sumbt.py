@@ -169,7 +169,7 @@ class SUMBTTracker(DST):
                 self.det_dic[value.lower()] = key + '-' + domain
 
         self.cached_res = {}
-        convert_to_glue_format(os.path.join(ROOT_PATH,args.data_dir), SUMBT_PATH)
+        convert_to_glue_format(os.path.join(ROOT_PATH,args.data_dir), SUMBT_PATH, args)
         if not os.path.isdir(os.path.join(SUMBT_PATH, args.output_dir)):
             os.makedirs(os.path.join(SUMBT_PATH, args.output_dir))
         self.train_examples = processor.get_train_examples(os.path.join(SUMBT_PATH, args.tmp_data_dir), accumulation=False)
@@ -206,7 +206,7 @@ class SUMBTTracker(DST):
         else:
             ptr_model = torch.load(model_ckpt)
         print('loading pretrained weights')
-        #ptr_model = {k:v for k, v in ptr_model.items() if 'lookup' not in k}
+        ptr_model = {k:v for k, v in ptr_model.items() if 'lookup' not in k}
         if not USE_CUDA or N_GPU == 1:
             state = model.state_dict()
             state.update(ptr_model)
@@ -348,9 +348,10 @@ class SUMBTTracker(DST):
         return predict_belief
 
     def train(self, load_model=False, model_path=None):
-
+         
         if load_model:
             if model_path is not None:
+                print('Calling load weights')
                 self.load_weights(model_path)
         ## Training utterances
         all_input_ids, all_input_len, all_label_ids = convert_examples_to_features(
