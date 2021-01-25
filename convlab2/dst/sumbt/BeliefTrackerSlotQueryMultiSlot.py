@@ -7,6 +7,7 @@ from torch.nn import CrossEntropyLoss
 
 from transformers import BertModel
 from transformers import BertPreTrainedModel
+from transformers import AutoModel
 
 
 class BertForUtteranceEncoding(BertPreTrainedModel):
@@ -18,6 +19,16 @@ class BertForUtteranceEncoding(BertPreTrainedModel):
 
     def forward(self, input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False):
         return self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, encoder_hidden_states=output_all_encoded_layers)
+
+class LMForUtteranceEncoding(PreTrainedModel):
+    def __init__(self, config):
+        super(XLMRoberaForUtteranceEncoding, self).__init__(config)
+
+        self.config = config
+        self.xlm_roberta = AutoModel.from_pretrained(config)
+
+    def forward(self, input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False):
+        return self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, encoder_hidden_states=output_all_encoded_layers)    
 
 
 class MultiHeadAttention(nn.Module):
@@ -90,8 +101,8 @@ class BeliefTracker(nn.Module):
         self.attn_head = args.attn_head
         self.device = device
 
-        ### Utterance Encoder
-        self.utterance_encoder = BertForUtteranceEncoding.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
+        ### Utterance 
+        self.utterance_encoder = LMForUtteranceEncoding.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
         self.utterance_encoder.train()
         self.bert_output_dim = self.utterance_encoder.config.hidden_size
         self.hidden_dropout_prob = self.utterance_encoder.config.hidden_dropout_prob
@@ -100,13 +111,14 @@ class BeliefTracker(nn.Module):
                 p.requires_grad = False
 
         ### slot, slot-value Encoder (not trainable)
-        self.sv_encoder = BertForUtteranceEncoding.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
+        self.sv_encoder = LMForUtteranceEncoding.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
         self.sv_encoder.train()
         for p in self.sv_encoder.bert.parameters():
             p.requires_grad = False
 
         self.slot_lookup = nn.Embedding(self.num_slots, self.bert_output_dim)
         self.value_lookup = nn.ModuleList([nn.Embedding(num_label, self.bert_output_dim) for num_label in num_labels])
+    
 
         ### Attention layer
         self.attn = MultiHeadAttention(self.attn_head, self.bert_output_dim, dropout=0)

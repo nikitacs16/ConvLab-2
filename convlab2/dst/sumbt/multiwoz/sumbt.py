@@ -13,7 +13,7 @@ from convlab2.util.file_util import cached_path
 
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
 
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AutoTokenizer
 from transformers import get_linear_schedule_with_warmup, AdamW
 
 from convlab2.dst.dst import DST
@@ -125,7 +125,7 @@ class SUMBTTracker(DST):
         label_list = processor.get_labels()
         num_labels = [len(labels) for labels in label_list]  # number of slot-values in each slot-type
         # tokenizer
-        self.tokenizer = BertTokenizer.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
