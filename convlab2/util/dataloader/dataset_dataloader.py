@@ -70,7 +70,7 @@ class MultiWOZDataloader(DatasetDataloader):
         else:
             data_key_list = [data_key]
         for data_key in data_key_list:
-            data = read_zipped_json(os.path.join(data_dir, '{}.json.zip'.format(data_key)), '{}.json'.format(data_key))
+            data = json.load(open(os.path.join(data_dir,'{}.json'.format(data_key)),'r'))
             print('loaded {}, size {}'.format(data_key, len(data)))
             for x in info_list:
                 self.data[data_key][x] = []

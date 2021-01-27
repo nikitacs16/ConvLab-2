@@ -46,7 +46,7 @@ class Processor(DataProcessor):
     def __init__(self, config):
         super(Processor, self).__init__()
 
-        print(config)
+        
         # MultiWOZ dataset
 
         with open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))), config.data_dir, "ontology.json"), "r") as fp_ontology:
@@ -270,7 +270,7 @@ class InputFeatures(object):
         self.label_id = label_id
 
 
-def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer, max_turn_length):
+def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer, max_turn_length, bos_token='[CLS]',eos_token='[SEP]'):
     """Loads a data file into a list of `InputBatch`s."""
 
     label_map = [{label: i for i, label in enumerate(labels)} for labels in label_list]

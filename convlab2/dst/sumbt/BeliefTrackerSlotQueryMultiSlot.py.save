@@ -7,8 +7,9 @@ from torch.nn import CrossEntropyLoss
 
 from transformers import BertModel
 from transformers import BertPreTrainedModel
-from transformers import AutoModel, AutoConfig
-
+from transformers import AutoModel, PreTrainedModel, AutoConfig
+from transformers import XLMPreTrainedModel, XLMModel
+from transformers import XLMTokenizer
 
 class BertForUtteranceEncoding(BertPreTrainedModel):
     def __init__(self, config):
@@ -19,17 +20,22 @@ class BertForUtteranceEncoding(BertPreTrainedModel):
 
     def forward(self, input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False):
         return self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, encoder_hidden_states=output_all_encoded_layers)
-'''
-class LMForUtteranceEncoding(PreTrainedModel):
+
+class LMForUtteranceEncoding(XLMPreTrainedModel):
     def __init__(self, config):
-        super(XLMRoberaForUtteranceEncoding, self).__init__(config)
+        super(LMForUtteranceEncoding, self).__init__(config)
 
-        self.config = config
-        self.bert = AutoModel.from_pretrained(config)
+        self.config = config #AutoConfig.from_pretrained(config, cache_dir=cache_dir)
+        self.bert = XLMModel(config)
 
-    def forward(self, input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False):
-        return self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, encoder_hidden_states=output_all_encoded_layers)    
-'''
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        print('This was called')
+        tokenizer = 
+        inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+        outputs = self.bert(**inputs)
+
+        return self.bert(input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask) 
+
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, heads, d_model, dropout=0.1):
@@ -102,23 +108,18 @@ class BeliefTracker(nn.Module):
         self.device = device
 
         ### Utterance 
-        self.utterance_encoder_config = AutoConfig.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
-        self.utterance_encoder = AutoModel.from_config(self.utterance_encoder_config)
+        self.utterance_encoder = LMForUtteranceEncoding.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
         self.utterance_encoder.train()
-        self.bert_output_dim = self.utterance_encoder_config.hidden_size
-        try:
-            self.hidden_dropout_prob = self.utterance_encoder_config.hidden_dropout_prob
-        except:
-            self.hidden_dropout_prob = self.utterance_encoder_config.dropout
+        self.bert_output_dim = self.utterance_encoder.config.hidden_size
+        self.hidden_dropout_prob = self.utterance_encoder.config.dropout #hidden_dropout_prob
         if args.fix_utterance_encoder:
-            for p in self.utterance_encoder.parameters():
+            for p in self.utterance_encoder.bert.pooler.parameters():
                 p.requires_grad = False
 
         ### slot, slot-value Encoder (not trainable)
-        self.sv_encoder_config = AutoConfig.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
-        self.sv_encoder = AutoModel.from_config(self.sv_encoder_config) #BertForUtteranceEncoding.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
+        self.sv_encoder = LMForUtteranceEncoding.from_pretrained(args.bert_model_name, cache_dir=args.bert_model_cache_dir)
         self.sv_encoder.train()
-        for p in self.sv_encoder.parameters():
+        for p in self.sv_encoder.bert.parameters():
             p.requires_grad = False
 
         self.slot_lookup = nn.Embedding(self.num_slots, self.bert_output_dim)
@@ -177,26 +178,24 @@ class BeliefTracker(nn.Module):
         # Slot encoding
         slot_type_ids = torch.zeros(slot_ids.size(), dtype=torch.long).to(self.device)
         slot_mask = slot_ids > 0
+        print(slot_mask)
+        print(slot_mask.view(-1, self.max_label_length))
 
-        hid_slot = self.sv_encoder(input_ids = slot_ids.view(-1, self.max_label_length),
-                                      token_type_ids = slot_type_ids.view(-1, self.max_label_length),
-                                      attention_mask =slot_mask.view(-1, self.max_label_length))
-                                      #output_all_encoded_layers=False)
-        #print(hid_slot.size())
-        hid_slot = hid_slot.last_hidden_state           
+        hid_slot, _ = self.sv_encoder(slot_ids.view(-1, self.max_label_length),
+                                      slot_type_ids.view(-1, self.max_label_length),
+                                      slot_mask.view(-1, self.max_label_length)
+                                      )
         hid_slot = hid_slot[:, 0, :]
-        
         hid_slot = hid_slot.detach()
         self.slot_lookup = nn.Embedding.from_pretrained(hid_slot, freeze=True)
 
         for s, label_id in enumerate(label_ids):
             label_type_ids = torch.zeros(label_id.size(), dtype=torch.long).to(self.device)
             label_mask = label_id > 0
-            hid_label = self.sv_encoder(input_ids = label_id.view(-1, self.max_label_length),
-                                           token_type_ids = label_type_ids.view(-1, self.max_label_length),
-                                           attention_mask = label_mask.view(-1, self.max_label_length)
+            hid_label, _ = self.sv_encoder(label_id.view(-1, self.max_label_length),
+                                           label_type_ids.view(-1, self.max_label_length),
+                                           label_mask.view(-1, self.max_label_length)
                                            )
-            hid_label = hid_label.last_hidden_state
             hid_label = hid_label[:, 0, :]
             hid_label = hid_label.detach()
             self.value_lookup[s] = nn.Embedding.from_pretrained(hid_label, freeze=True)
@@ -231,12 +230,10 @@ class BeliefTracker(nn.Module):
         # Utterance encoding
         token_type_ids, attention_mask = self._make_aux_tensors(input_ids, input_len)
 
-        hidden = self.utterance_encoder(input_ids = input_ids.view(-1, self.max_seq_length),
-                                           token_type_ids = token_type_ids.view(-1, self.max_seq_length),
-                                           attention_mask = attention_mask.view(-1, self.max_seq_length)
+        hidden, _ = self.utterance_encoder(input_ids.view(-1, self.max_seq_length),
+                                           token_type_ids.view(-1, self.max_seq_length),
+                                           attention_mask.view(-1, self.max_seq_length)
                                            )
-        hidden = hidden.last_hidden_state
-        #print(hidden.size())
         hidden = torch.mul(hidden, attention_mask.view(-1, self.max_seq_length, 1).expand(hidden.size()).float())
         hidden = hidden.repeat(slot_dim, 1, 1)  # [(slot_dim*ds*ts), bert_seq, hid_size]
 

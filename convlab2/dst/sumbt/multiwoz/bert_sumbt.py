@@ -22,7 +22,7 @@ from convlab2.dst.sumbt.multiwoz.convert_to_glue_format import convert_to_glue_f
 from convlab2.util.multiwoz.state import default_state as default_state_en
 from convlab2.util.multiwoz_zh.state import default_state as default_state_zh
 
-from convlab2.dst.sumbt.BeliefTrackerSlotQueryMultiSlot import BeliefTracker
+from convlab2.dst.sumbt.BeliefTrackerSlotQueryMultiSlot2 import BeliefTracker
 from convlab2.dst.sumbt.multiwoz.sumbt_utils import *
 from convlab2.dst.sumbt.multiwoz.sumbt_utils import Processor as ProcessorEn
 from convlab2.dst.sumbt.multiwoz_zh.sumbt_utils import Processor as ProcessorZh
@@ -54,7 +54,7 @@ def _clip_grad_norm(params, clip_grad_norm):
 def get_label_embedding(labels, max_seq_length, tokenizer, device):
     features = []
     for label in labels:
-        label_tokens = ["<s>"] + tokenizer.tokenize(label) + ["</s>"] #check this!
+        label_tokens = ["[CLS]"] + tokenizer.tokenize(label) + ["[SEP]"] #check this!
         label_token_ids = tokenizer.convert_tokens_to_ids(label_tokens)
         label_len = len(label_token_ids)
 
@@ -120,7 +120,7 @@ class SUMBTTracker(DST):
             default_state = default_state_en
             processor = ProcessorEn(args)
             eval_slots = multiwoz_slot_list_en
-
+        self.default_state = default_state
         self.processor = processor
         label_list = processor.get_labels()
         num_labels = [len(labels) for labels in label_list]  # number of slot-values in each slot-type
@@ -220,7 +220,9 @@ class SUMBTTracker(DST):
         #print(state['slot_lookup.weight'].size())
 
     def init_session(self):
-        self.state = default_state()
+      
+        self.state = self.default_state()
+        #print(self.state)
         if not self.param_restored:
             if os.path.isfile(os.path.join(DOWNLOAD_DIRECTORY, 'pytorch_model_.bin')):
                 print('loading weights from downloaded model')
@@ -261,7 +263,8 @@ class SUMBTTracker(DST):
                     else:
                         raise Exception(
                             'Error: domain <{}> not in belief state'.format(domain))
-            slot = REF_SYS_DA[domain.capitalize()].get(slot, slot)
+            if self.args.lang == 'en':
+                slot = REF_SYS_DA[domain.capitalize()].get(slot, slot)
             assert 'semi' in new_belief_state[domain]
             assert 'book' in new_belief_state[domain]
             if '预订' in slot:
@@ -289,19 +292,21 @@ class SUMBTTracker(DST):
                     f.write(
                         'unknown slot name <{}> with value <{}> of domain <{}>\nitem: {}\n\n'.format(slot, value, domain, state)
                     )
-        new_request_state = copy.deepcopy(prev_state['request_state'])
-        # update request_state
-        user_request_slot = self.detect_requestable_slots(user_act)
-        for domain in user_request_slot:
-            for key in user_request_slot[domain]:
-                if domain not in new_request_state:
-                    new_request_state[domain] = {}
-                if key not in new_request_state[domain]:
-                    new_request_state[domain][key] = user_request_slot[domain][key]
+        if self.args.lang == 'en':
+            new_request_state = copy.deepcopy(prev_state['request_state'])
+        # update request_state	
+            user_request_slot = self.detect_requestable_slots(user_act)
+            for domain in user_request_slot:
+                for key in user_request_slot[domain]:
+                    if domain not in new_request_state:
+                        new_request_state[domain] = {}
+                    if key not in new_request_state[domain]:
+                        new_request_state[domain][key] = user_request_slot[domain][key]
 
         new_state = copy.deepcopy(dict(prev_state))
         new_state['belief_state'] = new_belief_state
-        new_state['request_state'] = new_request_state
+        if self.args.lang == 'en':
+            new_state['request_state'] = new_request_state
         self.state = new_state
         # print((pred_states, query))
         return self.state
